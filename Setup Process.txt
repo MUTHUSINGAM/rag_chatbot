@@ -1,0 +1,197 @@
+# RAG Chatbot Documentation with Code Explanation
+
+## Installation and Setup
+The script begins by installing necessary libraries for text extraction, summarization, retrieval, and video processing.
+
+```python
+!pip install torch transformers faiss-cpu sentence-transformers pdfplumber
+!pip install pymupdf python-docx pytesseract openai-whisper moviepy
+!apt-get update && apt-get install -y tesseract-ocr
+```
+
+These installations include:
+- `torch` for deep learning models
+- `transformers` for text processing
+- `faiss-cpu` for efficient vector search
+- `pdfplumber`, `pytesseract`, and `docx` for document parsing
+- `openai-whisper` for audio transcription
+
+---
+
+## Importing Dependencies
+
+```python
+import os
+import re
+import faiss
+import requests
+import pdfplumber
+import numpy as np
+import pandas as pd
+import pytesseract
+import faster_whisper
+from bs4 import BeautifulSoup
+from pytube import YouTube
+from youtube_transcript_api import YouTubeTranscriptApi
+from PIL import Image
+from docx import Document
+from sentence_transformers import SentenceTransformer
+from transformers import AutoModelForSeq2SeqLM, AutoTokenizer
+import torch
+```
+
+These modules provide functionality for text processing, web scraping, YouTube video transcription, and vector-based retrieval.
+
+---
+
+## Loading Models
+
+### Summarization Model (BART)
+```python
+print("🔹 Loading Summarization Model...")
+model = AutoModelForSeq2SeqLM.from_pretrained("facebook/bart-large-cnn").to("cuda" if torch.cuda.is_available() else "cpu")
+tokenizer = AutoTokenizer.from_pretrained("facebook/bart-large-cnn")
+```
+BART is used for abstractive text summarization.
+
+### Embedding Model (SentenceTransformer)
+```python
+print("🔹 Loading Embedding Model...")
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+```
+MiniLM provides sentence embeddings for similarity search.
+
+### Whisper Model for Speech-to-Text
+```python
+print("🔹 Loading Whisper Model...")
+whisper_model = faster_whisper.WhisperModel("base")
+```
+Whisper transcribes video/audio files into text.
+
+---
+
+## FAISS Index Initialization
+```python
+dimension = 384  # MiniLM embedding size
+faiss_index = faiss.IndexFlatL2(dimension)
+documents = []  # Stores extracted sentences
+```
+This initializes a FAISS index for efficient similarity search.
+
+---
+
+## Functions for Data Extraction
+
+### Extract Text from Web Pages
+```python
+def extract_text_from_web(url):
+    try:
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(url, headers=headers, timeout=10)
+        response.raise_for_status()
+        soup = BeautifulSoup(response.text, 'html.parser')
+        paragraphs = soup.find_all('p')
+        text = "\n".join([para.get_text() for para in paragraphs])
+        return text.strip() if text.strip() else "No meaningful text found on the webpage."
+    except Exception as e:
+        return f"Error extracting text from {url}: {str(e)}"
+```
+This function fetches text from a webpage using BeautifulSoup.
+
+### Extract Subtitles from YouTube Videos
+```python
+def extract_text_from_youtube(url):
+    try:
+        video_id = url.split("v=")[-1]
+        transcript = YouTubeTranscriptApi.get_transcript(video_id)
+        text = " ".join([t['text'] for t in transcript])
+        return text.strip() if text.strip() else "No subtitles found for this YouTube video."
+    except Exception as e:
+        return f"Error extracting subtitles from YouTube: {str(e)}"
+```
+This function extracts subtitles from YouTube videos.
+
+### Extract Text from PDF
+```python
+def extract_text_from_pdf(pdf_path):
+    text = ""
+    with pdfplumber.open(pdf_path) as pdf:
+        for page in pdf.pages:
+            page_text = page.extract_text()
+            if page_text:
+                text += page_text + "\n"
+    return text.strip()
+```
+Parses text from PDFs using `pdfplumber`.
+
+### Extract Text from Images (OCR)
+```python
+def extract_text_from_image(file_path):
+    text = pytesseract.image_to_string(Image.open(file_path)).strip()
+    return text if text else "No readable text found."
+```
+Extracts text from images using `pytesseract` OCR.
+
+---
+
+## FAISS Vector Search
+```python
+def retrieve_top_k(query, k=3):
+    if not documents:
+        return "❌ No documents available for retrieval."
+    query_embedding = embedding_model.encode([query], convert_to_numpy=True)
+    _, indices = faiss_index.search(query_embedding, k)
+    retrieved_texts = [documents[idx] for idx in indices[0] if idx < len(documents)]
+    return "\n".join(retrieved_texts) if retrieved_texts else "❌ No relevant context found."
+```
+Retrieves the top K most relevant sentences for a query.
+
+---
+
+## Text Summarization
+```python
+def generate_summary(text):
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    model.to(device)
+    inputs = tokenizer("summarize: " + text, return_tensors="pt", max_length=512, truncation=True).to(device)
+    with torch.no_grad():
+        summary_ids = model.generate(inputs.input_ids, max_length=150, min_length=50, num_beams=4, early_stopping=True)
+    return tokenizer.decode(summary_ids[0], skip_special_tokens=True)
+```
+Uses BART to generate an abstractive summary of extracted text.
+
+---
+
+## RAG Chatbot Workflow
+```python
+def chatbot():
+    global faiss_index, documents
+    faiss_index = faiss.IndexFlatL2(dimension)
+    documents = []
+    while True:
+        source = input("Enter file path or URL (or 'done' to finish): ").strip()
+        if source.lower() == "done":
+            break
+        extracted_text = process_input(source)
+        if extracted_text:
+            add_document(extracted_text)
+            print(f"✅ Successfully processed {source}.")
+    while True:
+        query = input("\n🔍 Enter your query (or 'exit' to quit): ").strip()
+        if query.lower() == "exit":
+            break
+        retrieved_text = retrieve_top_k(query)
+        print("\n📌 **Top Retrieved Contexts:**", retrieved_text)
+        summary = generate_summary(retrieved_text)
+        print("\n📌 **Abstractive Summary:**", summary)
+```
+The chatbot allows users to:
+1. Upload files or URLs for processing.
+2. Retrieve contextually relevant information from indexed documents.
+3. Summarize retrieved text using an abstractive summarization model.
+
+---
+
+## Conclusion
+This script combines web scraping, document parsing, text retrieval, and summarization to create a Retrieval-Augmented Generation (RAG) chatbot. The FAISS index stores document embeddings, while the BART model generates summaries, making it efficient for answering queries from diverse sources.
+
