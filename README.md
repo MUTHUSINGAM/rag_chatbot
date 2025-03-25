@@ -62,6 +62,24 @@ streamlit run app.py
 - 💬 **Better UI/UX** with a more interactive **ChatGPT-like interface**.
 - 🏎️ **GPU Optimization** for even faster processing.
 
-## 🤝 Contributing
-Feel free to contribute via pull requests or report issues. Let’s build something amazing! 🚀
+## Output:
+![Screenshot 2025-03-25 115416](https://github.com/user-attachments/assets/7e2a0c70-c39b-4311-9843-266638a2150c)
+
+![Screenshot 2025-03-25 115437](https://github.com/user-attachments/assets/22a0d34c-a035-47cb-889a-386ca22132a2)
+
+
+![Screenshot 2025-03-25 115453](https://github.com/user-attachments/assets/65225097-3f63-42c5-a2b1-39a7a89e14ed)
+
+![Screenshot 2025-03-25 120048](https://github.com/user-attachments/assets/821deabc-c16e-4964-8157-4e5ce9f9fb4a)
+
+
+![Screenshot 2025-03-25 121501](https://github.com/user-attachments/assets/1babc2b9-5dd7-4e1a-80b9-f4a3638d69e1)
+
+
+![Screenshot 2025-03-25 121506](https://github.com/user-attachments/assets/9dcf6af8-72d3-40de-9296-957874e78130)
+
+
+
+
+
 
